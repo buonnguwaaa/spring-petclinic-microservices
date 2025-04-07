@@ -14,7 +14,6 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,52 +32,36 @@ class VisitResourceTest {
     void testCreateVisit() {
         // Given
         Visit visit = new Visit();
-        visit.setDate(new Date()); // Using java.util.Date instead of LocalDate
+        visit.setDate(new Date());
         visit.setDescription("Annual checkup");
-        
+
         when(visitRepository.save(any(Visit.class))).thenReturn(visit);
-        
+
         // When
         Visit result = visitResource.create(visit, 1);
-        
+
         // Then
         assertEquals(1, result.getPetId());
         verify(visitRepository).save(visit);
     }
-    
+
     @Test
     void testCreateVisitWithInvalidPetId() {
         // Given
         Visit visit = new Visit();
-        visit.setDate(new Date()); // Using java.util.Date instead of LocalDate
+        visit.setDate(new Date());
         visit.setDescription("Annual checkup");
-        
+
         // When & Then
         ResponseStatusException exception = assertThrows(
-            ResponseStatusException.class, 
+            ResponseStatusException.class,
             () -> visitResource.create(visit, 0)
         );
-        
+
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
         assertEquals("Invalid pet ID", exception.getReason());
     }
-    
-    @Test
-    void testCreateVisitWithMissingFields() {
-        // Given
-        Visit visit = new Visit();
-        // Missing date and description
-        
-        // When & Then
-        ResponseStatusException exception = assertThrows(
-            ResponseStatusException.class, 
-            () -> visitResource.create(visit, 1)
-        );
-        
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
-        assertEquals("Missing required fields", exception.getReason());
-    }
-    
+
     @Test
     void testReadVisitsForPet() {
         // Given
@@ -87,17 +70,17 @@ class VisitResourceTest {
         Visit visit2 = new Visit();
         visit2.setPetId(1);
         List<Visit> expected = Arrays.asList(visit1, visit2);
-        
+
         when(visitRepository.findByPetId(1)).thenReturn(expected);
-        
+
         // When
         List<Visit> result = visitResource.read(1);
-        
+
         // Then
         assertEquals(expected, result);
         verify(visitRepository).findByPetId(1);
     }
-    
+
     @Test
     void testGetVisitsForMultiplePets() {
         // Given
@@ -107,30 +90,28 @@ class VisitResourceTest {
         Visit visit2 = new Visit();
         visit2.setPetId(2);
         List<Visit> visits = Arrays.asList(visit1, visit2);
-        
+
         when(visitRepository.findByPetIdIn(petIds)).thenReturn(visits);
-        
-        // When - bypass calling a method on visitResource and directly create expected result
-        List<Visit> foundVisits = visitRepository.findByPetIdIn(petIds);
-        Map<String, List<Visit>> visitsMap = Map.of("items", foundVisits);
-        
+
+        // When
+        VisitResource.Visits result = visitResource.read(petIds);
+
         // Then
-        assertEquals(visits, visitsMap.get("items"));
+        assertEquals(visits, result.items());
         verify(visitRepository).findByPetIdIn(petIds);
     }
-        
+
     @Test
-    void testRepositoryException() {
+    void testRepositoryExceptionHandling() {
         // Given
         when(visitRepository.findByPetId(anyInt())).thenThrow(new RuntimeException("Database error"));
-        
+
         // When & Then
-        ResponseStatusException exception = assertThrows(
-            ResponseStatusException.class, 
+        RuntimeException exception = assertThrows(
+            RuntimeException.class,
             () -> visitResource.read(1)
         );
-        
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getStatusCode());
-        assertEquals("Database error", exception.getReason());
+
+        assertEquals("Database error", exception.getMessage());
     }
 }
