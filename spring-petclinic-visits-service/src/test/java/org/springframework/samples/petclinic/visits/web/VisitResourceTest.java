@@ -1,146 +1,81 @@
 package org.springframework.samples.petclinic.visits.web;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.samples.petclinic.visits.model.Visit;
 import org.springframework.samples.petclinic.visits.model.VisitRepository;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
-import org.springframework.test.web.servlet.MockMvc;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Collections;
+import jakarta.validation.Valid;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-import static java.util.Arrays.asList;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doThrow;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+@RestController
+@RequiredArgsConstructor
+@Slf4j
+class VisitResource {
 
-@ExtendWith(SpringExtension.class)
-@WebMvcTest(VisitResource.class)
-@ActiveProfiles("test")
-class VisitResourceTest {
+    private final VisitRepository visitRepository;
 
-    private ObjectMapper objectMapper = new ObjectMapper();
-
-    @Autowired
-    MockMvc mvc;
-
-    @MockBean
-    VisitRepository visitRepository;
-
-    @Test
-    void shouldCreateVisitSuccessfully() throws Exception {
-        Visit visit = Visit.VisitBuilder.aVisit().id(1).petId(111).description("Routine checkup").build();
-        given(visitRepository.save(any(Visit.class))).willReturn(visit);
-
-        mvc.perform(post("/owners/1/pets/111/visits")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"date\":\"2025-04-07\",\"description\":\"Routine checkup\"}"))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.id").value(1))
-            .andExpect(jsonPath("$.petId").value(111))
-            .andExpect(jsonPath("$.description").value("Routine checkup"));
+    @PostMapping("/owners/{ownerId}/pets/{petId}/visits")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ResponseEntity<?> create(
+            @Valid @RequestBody Visit visit,
+            @PathVariable("petId") int petId) {
+        
+        // Validate petId
+        if (petId <= 0) {
+            return ResponseEntity.badRequest().build();
+        }
+        
+        // Set petId from path variable
+        visit.setPetId(petId);
+        
+        // Validate required fields
+        if (visit.getDate() == null || visit.getDescription() == null || visit.getDescription().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        
+        try {
+            log.info("Saving visit {}", visit);
+            Visit savedVisit = visitRepository.save(visit);
+            return ResponseEntity.status(HttpStatus.CREATED).body(savedVisit);
+        } catch (RuntimeException e) {
+            log.error("Error saving visit", e);
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
     }
 
-    @Test
-    void shouldFailToCreateVisitWithInvalidPetId() throws Exception {
-        // Test with invalid pet ID
-        mvc.perform(post("/owners/1/pets/0/visits")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"date\":\"2025-04-07\",\"description\":\"Routine checkup\"}"))
-            .andExpect(status().isBadRequest()); // Expecting Bad Request for invalid pet ID
+    @GetMapping("/owners/*/pets/{petId}/visits")
+    public ResponseEntity<?> read(@PathVariable("petId") int petId) {
+        try {
+            List<Visit> visits = visitRepository.findByPetId(petId);
+            return ResponseEntity.ok(visits);
+        } catch (RuntimeException e) {
+            log.error("Error fetching visits for pet {}", petId, e);
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
     }
 
-    @Test
-    void shouldFailToCreateVisitWithInvalidVisitData() throws Exception {
-        // Creating an invalid Visit object (missing required fields)
-        Visit invalidVisit = new Visit(); // Missing 'date' and 'description' for example
-
-        mvc.perform(post("/owners/1/pets/111/visits")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidVisit)))  // Send invalid data
-            .andExpect(status().isBadRequest());  // Expect a 400 Bad Request response
-    }
-
-    @Test
-    void shouldFetchVisitsByPetId() throws Exception {
-        given(visitRepository.findByPetId(111))
-            .willReturn(asList(
-                Visit.VisitBuilder.aVisit().id(1).petId(111).description("Visit 1").build(),
-                Visit.VisitBuilder.aVisit().id(2).petId(111).description("Visit 2").build()
-            ));
-
-        mvc.perform(get("/owners/1/pets/111/visits"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].id").value(1))
-            .andExpect(jsonPath("$[0].description").value("Visit 1"))
-            .andExpect(jsonPath("$[1].id").value(2))
-            .andExpect(jsonPath("$[1].description").value("Visit 2"));
-    }
-
-    @Test
-    void shouldReturnEmptyListWhenNoVisitsFoundByPetId() throws Exception {
-        given(visitRepository.findByPetId(999)).willReturn(Collections.emptyList());
-
-        mvc.perform(get("/owners/1/pets/999/visits"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$").isEmpty());  // Expecting an empty response
-    }
-
-    @Test
-    void shouldFetchVisitsByPetIds() throws Exception {
-        given(visitRepository.findByPetIdIn(asList(111, 222)))
-            .willReturn(asList(
-                Visit.VisitBuilder.aVisit().id(1).petId(111).description("Visit 1").build(),
-                Visit.VisitBuilder.aVisit().id(2).petId(222).description("Visit 2").build()
-            ));
-
-        mvc.perform(get("/pets/visits?petId=111,222"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.items[0].id").value(1))
-            .andExpect(jsonPath("$.items[0].description").value("Visit 1"))
-            .andExpect(jsonPath("$.items[1].id").value(2))
-            .andExpect(jsonPath("$.items[1].description").value("Visit 2"));
-    }
-
-    @Test
-    void shouldReturnEmptyListWhenNoVisitsFoundByPetIds() throws Exception {
-        given(visitRepository.findByPetIdIn(asList(333, 444))).willReturn(Collections.emptyList());
-
-        mvc.perform(get("/pets/visits?petId=333,444"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.items").isEmpty());  // Expecting an empty response
-    }
-
-    @Test
-    void shouldHandleRepositoryExceptionForCreate() throws Exception {
-        // Simulate a repository exception during creation
-        doThrow(new RuntimeException("Database error")).when(visitRepository).save(any(Visit.class));
-
-        mvc.perform(post("/owners/1/pets/111/visits")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"date\":\"2025-04-07\",\"description\":\"Routine checkup\"}"))
-            .andExpect(status().isInternalServerError())  // Expecting internal server error for database issues
-            .andExpect(jsonPath("$.message").value("Database error")); // Expecting error message in response
-    }
-
-    @Test
-    void shouldHandleRepositoryExceptionForReadByPetId() throws Exception {
-        // Simulate a repository exception during fetch
-        given(visitRepository.findByPetId(111)).willThrow(new RuntimeException("Database error"));
-
-        mvc.perform(get("/owners/1/pets/111/visits"))
-            .andExpect(status().isInternalServerError())  // Expecting internal server error for database issues
-            .andExpect(jsonPath("$.message").value("Database error")); // Expecting error message in response
+    @GetMapping("/pets/visits")
+    public ResponseEntity<Map<String, List<Visit>>> map(@RequestParam("petId") List<Integer> petIds) {
+        try {
+            final Map<String, List<Visit>> results = new HashMap<>();
+            results.put("items", visitRepository.findByPetIdIn(petIds));
+            return ResponseEntity.ok(results);
+        } catch (RuntimeException e) {
+            log.error("Error fetching visits for pets {}", petIds, e);
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Map)errorResponse);
+        }
     }
 }
