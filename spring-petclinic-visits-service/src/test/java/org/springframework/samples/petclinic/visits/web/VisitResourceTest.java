@@ -22,11 +22,6 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class VisitResourceTest {
 
-    // Add this method to your VisitResource class
-    public Map<String, List<Visit>> map(List<Integer> petIds) {
-        List<Visit> visits = visitRepository.findByPetIdIn(petIds);
-        return Map.of("items", visits);
-    }
     @Mock
     private VisitRepository visitRepository;
 
@@ -115,15 +110,8 @@ class VisitResourceTest {
         when(visitRepository.findByPetIdIn(petIds)).thenReturn(expected);
         
         // When
-        // Option 1: If a similar method exists but with a different name, use that instead
-        // For example, if the method is named "getVisitsByPetIds" or similar:
-        Map<String, List<Visit>> result = visitResource.getVisitsByPetIds(petIds);
-        
-        // OR
-        
-        // Option 2: If you prefer to directly test the repository call:
-        List<Visit> visits = visitRepository.findByPetIdIn(petIds);
-        Map<String, List<Visit>> result = Map.of("items", visits);
+        // Test the map method directly
+        Map<String, List<Visit>> result = visitResource.map(petIds);
         
         // Then
         assertEquals(expected, result.get("items"));
