@@ -110,7 +110,7 @@ class VisitResourceTest {
         when(visitRepository.findByPetIdIn(petIds)).thenReturn(expected);
         
         // When
-        Map<String, List<Visit>> result = visitResource.map(petIds);
+        Map<String, List<Visit>> result = visitResource.map(petIds);  // <-- Error is here
         
         // Then
         assertEquals(expected, result.get("items"));
