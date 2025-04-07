@@ -83,7 +83,7 @@ class VisitResource {
             return visitRepository.findByPetId(petId);
         } catch (Exception ex) {
             log.error("Failed to fetch visits for petId={}", petId, ex);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch visits", ex);
+throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Database error", ex);
         }
     }
 
