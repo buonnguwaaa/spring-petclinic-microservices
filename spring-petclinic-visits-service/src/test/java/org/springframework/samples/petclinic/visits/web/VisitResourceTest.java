@@ -11,6 +11,7 @@ import org.springframework.samples.petclinic.visits.model.VisitRepository;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Collections;
 import java.util.List;
@@ -23,7 +24,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ExtendWith(SpringExtension.class)
 @WebMvcTest(VisitResource.class)
@@ -32,8 +32,6 @@ class VisitResourceTest {
 
     private ObjectMapper objectMapper = new ObjectMapper();
 
-    // other code
-    // other code
     @Autowired
     MockMvc mvc;
 
@@ -56,10 +54,11 @@ class VisitResourceTest {
 
     @Test
     void shouldFailToCreateVisitWithInvalidPetId() throws Exception {
+        // Test with invalid pet ID
         mvc.perform(post("/owners/1/pets/0/visits")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"date\":\"2025-04-07\",\"description\":\"Routine checkup\"}"))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isBadRequest()); // Expecting Bad Request for invalid pet ID
     }
 
     @Test
@@ -95,7 +94,7 @@ class VisitResourceTest {
 
         mvc.perform(get("/owners/1/pets/999/visits"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$").isEmpty());
+            .andExpect(jsonPath("$").isEmpty());  // Expecting an empty response
     }
 
     @Test
@@ -120,24 +119,28 @@ class VisitResourceTest {
 
         mvc.perform(get("/pets/visits?petId=333,444"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.items").isEmpty());
+            .andExpect(jsonPath("$.items").isEmpty());  // Expecting an empty response
     }
 
     @Test
     void shouldHandleRepositoryExceptionForCreate() throws Exception {
+        // Simulate a repository exception during creation
         doThrow(new RuntimeException("Database error")).when(visitRepository).save(any(Visit.class));
 
         mvc.perform(post("/owners/1/pets/111/visits")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"date\":\"2025-04-07\",\"description\":\"Routine checkup\"}"))
-            .andExpect(status().isInternalServerError());
+            .andExpect(status().isInternalServerError())  // Expecting internal server error for database issues
+            .andExpect(jsonPath("$.message").value("Database error")); // Expecting error message in response
     }
 
     @Test
     void shouldHandleRepositoryExceptionForReadByPetId() throws Exception {
+        // Simulate a repository exception during fetch
         given(visitRepository.findByPetId(111)).willThrow(new RuntimeException("Database error"));
 
         mvc.perform(get("/owners/1/pets/111/visits"))
-            .andExpect(status().isInternalServerError());
+            .andExpect(status().isInternalServerError())  // Expecting internal server error for database issues
+            .andExpect(jsonPath("$.message").value("Database error")); // Expecting error message in response
     }
 }
