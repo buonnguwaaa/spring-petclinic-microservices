@@ -1,94 +1,134 @@
 package org.springframework.samples.petclinic.visits.web;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.samples.petclinic.visits.model.Visit;
 import org.springframework.samples.petclinic.visits.model.VisitRepository;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import jakarta.validation.Valid;
-import java.util.HashMap;
+import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Controller for visit endpoints.
- */
-@RestController
-@RequiredArgsConstructor
-@Slf4j
-class VisitResource {
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
-    private final VisitRepository visitRepository;
+@ExtendWith(MockitoExtension.class)
+class VisitResourceTest {
 
-    /**
-     * Create a new visit.
-     *
-     * @param visit  Visit object to create
-     * @param petId  ID of the pet to associate with visit
-     * @return Created visit
-     */
-    @PostMapping("/owners/{ownerId}/pets/{petId}/visits")
-    @ResponseStatus(HttpStatus.CREATED)
-    public Visit create(
-            @Valid @RequestBody Visit visit,
-            @PathVariable("petId") int petId) {
+    @Mock
+    private VisitRepository visitRepository;
+
+    @InjectMocks
+    private VisitResource visitResource;
+
+    @Test
+    void testCreateVisit() {
+        // Given
+        Visit visit = new Visit();
+        visit.setDate(LocalDate.now());
+        visit.setDescription("Annual checkup");
         
-        // Validate petId
-        if (petId <= 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid pet ID");
-        }
+        when(visitRepository.save(any(Visit.class))).thenReturn(visit);
         
-        // Set petId from path variable
-        visit.setPetId(petId);
+        // When
+        Visit result = visitResource.create(visit, 1);
         
-        // Validate required fields
-        if (visit.getDate() == null || (visit.getDescription() == null || visit.getDescription().isEmpty())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing required fields");
-        }
-        
-        try {
-            log.info("Saving visit {}", visit);
-            return visitRepository.save(visit);
-        } catch (RuntimeException e) {
-            log.error("Error saving visit", e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Database error", e);
-        }
+        // Then
+        assertEquals(1, result.getPetId());
+        verify(visitRepository).save(visit);
     }
-
-    /**
-     * Read visits for a pet.
-     *
-     * @param petId ID of the pet
-     * @return List of visits
-     */
-    @GetMapping("/owners/*/pets/{petId}/visits")
-    public List<Visit> read(@PathVariable("petId") int petId) {
-        try {
-            return visitRepository.findByPetId(petId);
-        } catch (RuntimeException e) {
-            log.error("Error fetching visits for pet {}", petId, e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Database error", e);
-        }
+    
+    @Test
+    void testCreateVisitWithInvalidPetId() {
+        // Given
+        Visit visit = new Visit();
+        visit.setDate(LocalDate.now());
+        visit.setDescription("Annual checkup");
+        
+        // When & Then
+        ResponseStatusException exception = assertThrows(
+            ResponseStatusException.class, 
+            () -> visitResource.create(visit, 0)
+        );
+        
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        assertEquals("Invalid pet ID", exception.getReason());
     }
-
-    /**
-     * Read visits for multiple pets.
-     *
-     * @param petIds List of pet IDs
-     * @return Map with items key containing list of visits
-     */
-    @GetMapping("/pets/visits")
-    public Map<String, List<Visit>> map(@RequestParam("petId") List<Integer> petIds) {
-        try {
-            final Map<String, List<Visit>> visits = new HashMap<>();
-            visits.put("items", visitRepository.findByPetIdIn(petIds));
-            return visits;
-        } catch (RuntimeException e) {
-            log.error("Error fetching visits for pets {}", petIds, e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Database error", e);
-        }
+    
+    @Test
+    void testCreateVisitWithMissingFields() {
+        // Given
+        Visit visit = new Visit();
+        // Missing date and description
+        
+        // When & Then
+        ResponseStatusException exception = assertThrows(
+            ResponseStatusException.class, 
+            () -> visitResource.create(visit, 1)
+        );
+        
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        assertEquals("Missing required fields", exception.getReason());
+    }
+    
+    @Test
+    void testReadVisitsForPet() {
+        // Given
+        Visit visit1 = new Visit();
+        visit1.setPetId(1);
+        Visit visit2 = new Visit();
+        visit2.setPetId(1);
+        List<Visit> expected = Arrays.asList(visit1, visit2);
+        
+        when(visitRepository.findByPetId(1)).thenReturn(expected);
+        
+        // When
+        List<Visit> result = visitResource.read(1);
+        
+        // Then
+        assertEquals(expected, result);
+        verify(visitRepository).findByPetId(1);
+    }
+    
+    @Test
+    void testMapVisitsForMultiplePets() {
+        // Given
+        List<Integer> petIds = Arrays.asList(1, 2);
+        Visit visit1 = new Visit();
+        visit1.setPetId(1);
+        Visit visit2 = new Visit();
+        visit2.setPetId(2);
+        List<Visit> expected = Arrays.asList(visit1, visit2);
+        
+        when(visitRepository.findByPetIdIn(petIds)).thenReturn(expected);
+        
+        // When
+        Map<String, List<Visit>> result = visitResource.map(petIds);
+        
+        // Then
+        assertEquals(expected, result.get("items"));
+        verify(visitRepository).findByPetIdIn(petIds);
+    }
+    
+    @Test
+    void testRepositoryException() {
+        // Given
+        when(visitRepository.findByPetId(anyInt())).thenThrow(new RuntimeException("Database error"));
+        
+        // When & Then
+        ResponseStatusException exception = assertThrows(
+            ResponseStatusException.class, 
+            () -> visitResource.read(1)
+        );
+        
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getStatusCode());
+        assertEquals("Database error", exception.getReason());
     }
 }
