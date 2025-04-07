@@ -59,10 +59,13 @@ class VisitResourceTest {
 
     @Test
     void shouldFailToCreateVisitWithInvalidVisitData() throws Exception {
+        // Creating an invalid Visit object (missing required fields)
+        Visit invalidVisit = new Visit(); // Missing 'date' and 'description' for example
+
         mvc.perform(post("/owners/1/pets/111/visits")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{}")) // Missing required fields
-            .andExpect(status().isBadRequest());
+                .content(objectMapper.writeValueAsString(invalidVisit)))  // Send invalid data
+            .andExpect(status().isBadRequest());  // Expect a 400 Bad Request response
     }
 
     @Test
