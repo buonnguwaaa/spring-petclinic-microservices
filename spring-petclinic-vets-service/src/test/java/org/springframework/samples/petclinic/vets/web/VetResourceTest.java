@@ -28,12 +28,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static java.util.Arrays.asList;
+import java.util.List;
+
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import java.util.List;
 
 // /**
 //  * @author Maciej Szarlinski
@@ -79,25 +79,25 @@ class VetResourceTest {
     @Test
     void shouldGetAListOfVets() throws Exception {
 
-    Vet vet = new Vet();
-    vet.setId(1);
-    vet.setFirstName("Anna");
-    vet.setLastName("Smith");
+        Vet vet = new Vet();
+        vet.setId(1);
+        vet.setFirstName("Anna");
+        vet.setLastName("Smith");
 
-    Specialty specialty = new Specialty();
-    specialty.setName("surgery");
+        Specialty specialty = new Specialty();
+        specialty.setName("surgery");
 
-    // Cách đúng để thêm specialties
-    vet.getSpecialties().add(specialty);
+        // Sử dụng phương thức addSpecialty để thêm specialties
+        vet.addSpecialty(specialty);
 
-    given(vetRepository.findAll()).willReturn(List.of(vet));
+        given(vetRepository.findAll()).willReturn(List.of(vet));
 
-    mvc.perform(get("/vets").accept(MediaType.APPLICATION_JSON))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].id").value(1))
-        .andExpect(jsonPath("$[0].firstName").value("Anna"))
-        .andExpect(jsonPath("$[0].lastName").value("Smith"))
-        .andExpect(jsonPath("$[0].specialties[0].name").value("surgery"));
+        mvc.perform(get("/vets").accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(1))
+            .andExpect(jsonPath("$[0].firstName").value("Anna"))
+            .andExpect(jsonPath("$[0].lastName").value("Smith"))
+            .andExpect(jsonPath("$[0].specialties[0].name").value("surgery"));
     }
 }
 
