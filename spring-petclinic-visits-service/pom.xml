@@ -111,6 +111,14 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>3.4.1</version>
+                <configuration>
+                    <mainClass>org.springframework.samples.petclinic.visits.VisitsServiceApplication</mainClass>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.10</version>
@@ -131,7 +139,6 @@
             </plugin>
         </plugins>
     </build>
-
     <profiles>
         <profile>
             <id>buildDocker</id>
