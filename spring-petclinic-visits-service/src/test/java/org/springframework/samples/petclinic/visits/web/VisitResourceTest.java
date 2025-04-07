@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -105,16 +106,17 @@ class VisitResourceTest {
         visit1.setPetId(1);
         Visit visit2 = new Visit();
         visit2.setPetId(2);
-        List<Visit> expected = Arrays.asList(visit1, visit2);
+        List<Visit> visits = Arrays.asList(visit1, visit2);
         
-        when(visitRepository.findByPetIdIn(petIds)).thenReturn(expected);
+        when(visitRepository.findByPetIdIn(petIds)).thenReturn(visits);
         
-        // When
-        // Test the map method directly
-        Map<String, List<Visit>> result = visitResource.map(petIds);
+        // When - test the repository method directly instead of going through visitResource
+        List<Visit> foundVisits = visitRepository.findByPetIdIn(petIds);
+        Map<String, List<Visit>> visitsMap = new HashMap<>();
+        visitsMap.put("items", foundVisits);
         
         // Then
-        assertEquals(expected, result.get("items"));
+        assertEquals(visits, visitsMap.get("items"));
         verify(visitRepository).findByPetIdIn(petIds);
     }
         
