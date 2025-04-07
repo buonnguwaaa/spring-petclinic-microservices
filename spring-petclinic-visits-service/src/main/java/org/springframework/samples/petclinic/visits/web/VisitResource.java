@@ -65,15 +65,28 @@ class VisitResource {
         if (petId < 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid pet ID");
         }
+        if (visit.getDate() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Visit date is required");
+        }
+        if (visit.getDescription() == null || visit.getDescription().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Visit description is required");
+        }
         visit.setPetId(petId);
         logger.info("Saving visit {}", visit);
         return visitRepository.save(visit);
     }
 
+
     @GetMapping("owners/*/pets/{petId}/visits")
     public List<Visit> read(@PathVariable("petId") @Min(1) int petId) {
-        return visitRepository.findByPetId(petId);
+        try {
+            return visitRepository.findByPetId(petId);
+        } catch (Exception ex) {
+            log.error("Failed to fetch visits for petId={}", petId, ex);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch visits", ex);
+        }
     }
+
 
     @GetMapping("pets/visits")
     public Visits read(@RequestParam("petId") List<Integer> petIds) {

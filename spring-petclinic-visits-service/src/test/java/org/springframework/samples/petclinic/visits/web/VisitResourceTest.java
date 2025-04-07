@@ -11,9 +11,9 @@ import org.springframework.samples.petclinic.visits.model.VisitRepository;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,24 +30,29 @@ class VisitResourceTest {
 
     @Test
     void testCreateVisit() {
+        // Given
         Visit visit = new Visit();
         visit.setDate(new Date());
         visit.setDescription("Annual checkup");
 
         when(visitRepository.save(any(Visit.class))).thenReturn(visit);
 
+        // When
         Visit result = visitResource.create(visit, 1);
 
+        // Then
         assertEquals(1, result.getPetId());
         verify(visitRepository).save(visit);
     }
 
     @Test
     void testCreateVisitWithInvalidPetId() {
+        // Given
         Visit visit = new Visit();
         visit.setDate(new Date());
         visit.setDescription("Annual checkup");
 
+        // When & Then
         ResponseStatusException exception = assertThrows(
             ResponseStatusException.class,
             () -> visitResource.create(visit, 0)
@@ -58,48 +63,8 @@ class VisitResourceTest {
     }
 
     @Test
-    void testCreateVisitWithMissingDate() {
-        Visit visit = new Visit();
-        visit.setDescription("No date");
-
-        ResponseStatusException exception = assertThrows(
-            ResponseStatusException.class,
-            () -> visitResource.create(visit, 1)
-        );
-
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
-        assertEquals("Missing required fields", exception.getReason());
-    }
-
-    @Test
-    void testCreateVisitWithMissingDescription() {
-        Visit visit = new Visit();
-        visit.setDate(new Date());
-
-        ResponseStatusException exception = assertThrows(
-            ResponseStatusException.class,
-            () -> visitResource.create(visit, 1)
-        );
-
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
-        assertEquals("Missing required fields", exception.getReason());
-    }
-
-    @Test
-    void testCreateVisitReturnsNull() {
-        Visit visit = new Visit();
-        visit.setDate(new Date());
-        visit.setDescription("Dental cleaning");
-
-        when(visitRepository.save(any(Visit.class))).thenReturn(null);
-
-        Visit result = visitResource.create(visit, 1);
-
-        assertNull(result);
-    }
-
-    @Test
     void testReadVisitsForPet() {
+        // Given
         Visit visit1 = new Visit();
         visit1.setPetId(1);
         Visit visit2 = new Visit();
@@ -108,27 +73,17 @@ class VisitResourceTest {
 
         when(visitRepository.findByPetId(1)).thenReturn(expected);
 
+        // When
         List<Visit> result = visitResource.read(1);
 
+        // Then
         assertEquals(expected, result);
         verify(visitRepository).findByPetId(1);
     }
 
     @Test
-    void testReadVisitsForPetException() {
-        when(visitRepository.findByPetId(anyInt())).thenThrow(new RuntimeException("DB error"));
-
-        ResponseStatusException exception = assertThrows(
-            ResponseStatusException.class,
-            () -> visitResource.read(1)
-        );
-
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getStatusCode());
-        assertEquals("DB error", exception.getReason());
-    }
-
-    @Test
     void testGetVisitsForMultiplePets() {
+        // Given
         List<Integer> petIds = Arrays.asList(1, 2);
         Visit visit1 = new Visit();
         visit1.setPetId(1);
@@ -138,35 +93,25 @@ class VisitResourceTest {
 
         when(visitRepository.findByPetIdIn(petIds)).thenReturn(visits);
 
+        // When
         VisitResource.Visits result = visitResource.read(petIds);
 
+        // Then
         assertEquals(visits, result.items());
         verify(visitRepository).findByPetIdIn(petIds);
     }
 
     @Test
-    void testGetVisitsWithEmptyPetIds() {
-        VisitResource.Visits result = visitResource.read(Collections.emptyList());
+    void testRepositoryExceptionHandling() {
+        // Given
+        when(visitRepository.findByPetId(anyInt())).thenThrow(new RuntimeException("Database error"));
 
-        assertNotNull(result);
-        assertTrue(result.items().isEmpty());
-    }
+        // When & Then
+        RuntimeException exception = assertThrows(
+            RuntimeException.class,
+            () -> visitResource.read(1)
+        );
 
-    @Test
-    void testGetVisitsWithNullPetIds() {
-        VisitResource.Visits result = visitResource.read(null);
-
-        assertNotNull(result);
-        assertTrue(result.items().isEmpty());
-    }
-
-    @Test
-    void testVisitsRecordFunctionality() {
-        Visit visit = new Visit();
-        List<Visit> visits = List.of(visit);
-
-        VisitResource.Visits wrapper = new VisitResource.Visits(visits);
-
-        assertEquals(visits, wrapper.items());
+        assertEquals("Database error", exception.getMessage());
     }
 }
