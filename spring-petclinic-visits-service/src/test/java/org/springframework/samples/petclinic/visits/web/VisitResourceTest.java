@@ -112,8 +112,9 @@ class VisitResourceTest {
         });
 
         // Kiểm tra mã lỗi và thông báo lỗi
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getStatus());
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getStatusCode());  // Sửa từ getStatus() thành getStatusCode()
         assertEquals("Database error", exception.getReason());
     }
+
 
 }
