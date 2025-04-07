@@ -63,6 +63,40 @@ class VisitResourceTest {
     }
 
     @Test
+    void testCreateVisitWithNullDescription() {
+        // Given
+        Visit visit = new Visit();
+        visit.setDate(new Date());
+        visit.setDescription(null);  // Null description
+
+        // When & Then
+        ResponseStatusException exception = assertThrows(
+            ResponseStatusException.class,
+            () -> visitResource.create(visit, 1)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        assertEquals("Visit description is required", exception.getReason());
+    }
+
+    @Test
+    void testCreateVisitWithNullDate() {
+        // Given
+        Visit visit = new Visit();
+        visit.setDate(null);  // Null date
+        visit.setDescription("Annual checkup");
+
+        // When & Then
+        ResponseStatusException exception = assertThrows(
+            ResponseStatusException.class,
+            () -> visitResource.create(visit, 1)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        assertEquals("Visit date is required", exception.getReason());
+    }
+
+    @Test
     void testReadVisitsForPet() {
         // Given
         Visit visit1 = new Visit();
@@ -102,6 +136,22 @@ class VisitResourceTest {
     }
 
     @Test
+    void testGetVisitsForMultiplePetsEmptyList() {
+        // Given
+        List<Integer> petIds = Arrays.asList(1, 2);
+        List<Visit> visits = Arrays.asList(); // Empty list
+
+        when(visitRepository.findByPetIdIn(petIds)).thenReturn(visits);
+
+        // When
+        VisitResource.Visits result = visitResource.read(petIds);
+
+        // Then
+        assertTrue(result.items().isEmpty());
+        verify(visitRepository).findByPetIdIn(petIds);
+    }
+
+    @Test
     void testRepositoryExceptionHandling() {
         // Arrange
         when(visitRepository.findByPetId(anyInt())).thenThrow(new RuntimeException("Database error"));
@@ -112,9 +162,7 @@ class VisitResourceTest {
         });
 
         // Kiểm tra mã lỗi và thông báo lỗi
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getStatusCode());  // Sửa từ getStatus() thành getStatusCode()
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getStatusCode());
         assertEquals("Database error", exception.getReason());
     }
-
-
 }
