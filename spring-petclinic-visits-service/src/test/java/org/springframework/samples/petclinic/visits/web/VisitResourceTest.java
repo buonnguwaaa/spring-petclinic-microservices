@@ -10,8 +10,8 @@ import org.springframework.samples.petclinic.visits.model.Visit;
 import org.springframework.samples.petclinic.visits.model.VisitRepository;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -32,7 +32,7 @@ class VisitResourceTest {
     void testCreateVisit() {
         // Given
         Visit visit = new Visit();
-        visit.setDate(LocalDate.now());
+        visit.setDate(new Date()); // Using java.util.Date instead of LocalDate
         visit.setDescription("Annual checkup");
         
         when(visitRepository.save(any(Visit.class))).thenReturn(visit);
@@ -49,7 +49,7 @@ class VisitResourceTest {
     void testCreateVisitWithInvalidPetId() {
         // Given
         Visit visit = new Visit();
-        visit.setDate(LocalDate.now());
+        visit.setDate(new Date()); // Using java.util.Date instead of LocalDate
         visit.setDescription("Annual checkup");
         
         // When & Then
@@ -98,7 +98,7 @@ class VisitResourceTest {
     }
     
     @Test
-    void testMapVisitsForMultiplePets() {
+    void testGetVisitsForMultiplePets() {
         // Given
         List<Integer> petIds = Arrays.asList(1, 2);
         Visit visit1 = new Visit();
