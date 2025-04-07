@@ -103,15 +103,17 @@ class VisitResourceTest {
 
     @Test
     void testRepositoryExceptionHandling() {
-        // Given
+        // Arrange
         when(visitRepository.findByPetId(anyInt())).thenThrow(new RuntimeException("Database error"));
 
-        // When & Then
-        RuntimeException exception = assertThrows(
-            RuntimeException.class,
-            () -> visitResource.read(1)
-        );
+        // Act & Assert
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+            visitResource.read(1);
+        });
 
-        assertEquals("Database error", exception.getMessage());
+        // Kiểm tra mã lỗi và thông báo lỗi
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getStatus());
+        assertEquals("Database error", exception.getReason());
     }
+
 }
