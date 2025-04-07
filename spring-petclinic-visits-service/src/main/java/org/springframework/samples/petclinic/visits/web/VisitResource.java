@@ -53,14 +53,13 @@ class VisitResource {
         this.visitRepository = visitRepository;
     }
 
-    @PostMapping("owners/*/pets/{petId}/visits")
-    @ResponseStatus(HttpStatus.CREATED)
-    public Visit create(
-        @Valid @RequestBody Visit visit,
-        @PathVariable("petId") @Min(1) int petId) {
-
+    @PostMapping("/owners/*/pets/{petId}/visits")
+    public Visit create(@RequestBody Visit visit, @PathVariable("petId") int petId) {
+        if (petId < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid pet ID");
+        }
         visit.setPetId(petId);
-        log.info("Saving visit {}", visit);
+        logger.info("Saving visit {}", visit);
         return visitRepository.save(visit);
     }
 
