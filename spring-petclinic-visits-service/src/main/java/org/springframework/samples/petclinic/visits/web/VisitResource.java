@@ -32,11 +32,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 /**
  * @author Juergen Hoeller
@@ -50,8 +45,6 @@ import org.slf4j.LoggerFactory;
 @Timed("petclinic.visit")
 class VisitResource {
 
-    private static final Logger logger = LoggerFactory.getLogger(VisitResource.class);
-
     private static final Logger log = LoggerFactory.getLogger(VisitResource.class);
 
     private final VisitRepository visitRepository;
@@ -60,33 +53,21 @@ class VisitResource {
         this.visitRepository = visitRepository;
     }
 
-    @PostMapping("/owners/*/pets/{petId}/visits")
-    public Visit create(@RequestBody Visit visit, @PathVariable("petId") int petId) {
-        if (petId < 1) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid pet ID");
-        }
-        if (visit.getDate() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Visit date is required");
-        }
-        if (visit.getDescription() == null || visit.getDescription().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Visit description is required");
-        }
+    @PostMapping("owners/*/pets/{petId}/visits")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Visit create(
+        @Valid @RequestBody Visit visit,
+        @PathVariable("petId") @Min(1) int petId) {
+
         visit.setPetId(petId);
-        logger.info("Saving visit {}", visit);
+        log.info("Saving visit {}", visit);
         return visitRepository.save(visit);
     }
 
-
     @GetMapping("owners/*/pets/{petId}/visits")
     public List<Visit> read(@PathVariable("petId") @Min(1) int petId) {
-        try {
-            return visitRepository.findByPetId(petId);
-        } catch (Exception ex) {
-            log.error("Failed to fetch visits for petId={}", petId, ex);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Database error", ex);
-        }
+        return visitRepository.findByPetId(petId);
     }
-
 
     @GetMapping("pets/visits")
     public Visits read(@RequestParam("petId") List<Integer> petIds) {
