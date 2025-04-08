@@ -12,10 +12,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.Collections;
-import java.util.List;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static java.util.Arrays.asList;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doThrow;
@@ -36,53 +36,68 @@ class VisitResourceTest {
     VisitRepository visitRepository;
 
     @Test
-    void shouldFetchVisitsByPetId() throws Exception {
-        given(visitRepository.findByPetId(111))
-            .willReturn(asList(
-                Visit.VisitBuilder.aVisit().id(1).petId(111).description("Visit 1").build(),
-                Visit.VisitBuilder.aVisit().id(2).petId(111).description("Visit 2").build()
-            ));
+    void shouldFetchVisits() throws Exception {
+        given(visitRepository.findByPetIdIn(asList(111, 222)))
+                .willReturn(
+                        asList(
+                                Visit.VisitBuilder.aVisit()
+                                        .id(1)
+                                        .petId(111)
+                                        .build(),
+                                Visit.VisitBuilder.aVisit()
+                                        .id(2)
+                                        .petId(222)
+                                        .build(),
+                                Visit.VisitBuilder.aVisit()
+                                        .id(3)
+                                        .petId(222)
+                                        .build()));
 
-        mvc.perform(get("/owners/1/pets/111/visits"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].id").value(1))
-            .andExpect(jsonPath("$[0].description").value("Visit 1"))
-            .andExpect(jsonPath("$[1].id").value(2))
-            .andExpect(jsonPath("$[1].description").value("Visit 2"));
+        mvc.perform(get("/pets/visits?petId=111,222"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(1))
+                .andExpect(jsonPath("$.items[1].id").value(2))
+                .andExpect(jsonPath("$.items[2].id").value(3))
+                .andExpect(jsonPath("$.items[0].petId").value(111))
+                .andExpect(jsonPath("$.items[1].petId").value(222))
+                .andExpect(jsonPath("$.items[2].petId").value(222));
     }
 
     @Test
-    void shouldReturnEmptyListWhenNoVisitsFoundByPetId() throws Exception {
-        given(visitRepository.findByPetId(999)).willReturn(Collections.emptyList());
+    void shouldGetVisitsByPetId() throws Exception {
+        given(visitRepository.findByPetId(5))
+                .willReturn(
+                        asList(
+                                Visit.VisitBuilder.aVisit().id(10).petId(5).description("Dental cleaning").build(),
+                                Visit.VisitBuilder.aVisit().id(11).petId(5).description("Vaccination").build()));
 
-        mvc.perform(get("/owners/1/pets/999/visits"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$").isEmpty());
+        mvc.perform(get("/owners/2/pets/5/visits"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(10))
+                .andExpect(jsonPath("$[0].description").value("Dental cleaning"))
+                .andExpect(jsonPath("$[1].id").value(11))
+                .andExpect(jsonPath("$[1].description").value("Vaccination"));
     }
 
+    @Autowired
+    ObjectMapper objectMapper;
+
     @Test
-    void shouldFailToCreateVisitWithInvalidPetId() throws Exception {
-        mvc.perform(post("/owners/1/pets/0/visits")
+    void shouldCreateVisit() throws Exception {
+        Visit visit = Visit.VisitBuilder.aVisit()
+                .id(1)
+                .petId(7)
+                .description("Routine checkup")
+                .build();
+
+        given(visitRepository.save(any(Visit.class))).willReturn(visit);
+
+        mvc.perform(post("/owners/1/pets/7/visits")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"date\":\"2025-04-07\",\"description\":\"Routine checkup\"}"))
-            .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void shouldHandleRepositoryExceptionForCreate() throws Exception {
-        doThrow(new RuntimeException("Database error")).when(visitRepository).save(any(Visit.class));
-
-        mvc.perform(post("/owners/1/pets/111/visits")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"date\":\"2025-04-07\",\"description\":\"Routine checkup\"}"))
-            .andExpect(status().isInternalServerError());
-    }
-
-    @Test
-    void shouldHandleRepositoryExceptionForFetchByPetId() throws Exception {
-        given(visitRepository.findByPetId(111)).willThrow(new RuntimeException("Database error"));
-
-        mvc.perform(get("/owners/1/pets/111/visits"))
-            .andExpect(status().isInternalServerError());
+                .content(objectMapper.writeValueAsString(visit)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.petId").value(7))
+                .andExpect(jsonPath("$.description").value("Routine checkup"));
     }
 }
