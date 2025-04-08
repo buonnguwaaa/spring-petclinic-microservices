@@ -2,60 +2,167 @@ package org.springframework.samples.petclinic.visits.web;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.samples.petclinic.visits.model.Visit;
 import org.springframework.samples.petclinic.visits.model.VisitRepository;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
-import static java.util.Arrays.asList;
-import static org.mockito.BDDMockito.given;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
-@ExtendWith(SpringExtension.class)
-@WebMvcTest(VisitResource.class)
-@ActiveProfiles("test")
+@ExtendWith(MockitoExtension.class)
 class VisitResourceTest {
 
-    @Autowired
-    MockMvc mvc;
+    @Mock
+    private VisitRepository visitRepository;
 
-    @MockBean
-    VisitRepository visitRepository;
+    @InjectMocks
+    private VisitResource visitResource;
 
     @Test
-    void shouldFetchVisits() throws Exception {
-        given(visitRepository.findByPetIdIn(asList(111, 222)))
-            .willReturn(
-                asList(
-                    Visit.VisitBuilder.aVisit()
-                        .id(1)
-                        .petId(111)
-                        .build(),
-                    Visit.VisitBuilder.aVisit()
-                        .id(2)
-                        .petId(222)
-                        .build(),
-                    Visit.VisitBuilder.aVisit()
-                        .id(3)
-                        .petId(222)
-                        .build()
-                )
-            );
+    void testCreateVisit() {
+        // Given
+        Visit visit = new Visit();
+        visit.setDate(new Date());
+        visit.setDescription("Annual checkup");
 
-        mvc.perform(get("/pets/visits?petId=111,222"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.items[0].id").value(1))
-            .andExpect(jsonPath("$.items[1].id").value(2))
-            .andExpect(jsonPath("$.items[2].id").value(3))
-            .andExpect(jsonPath("$.items[0].petId").value(111))
-            .andExpect(jsonPath("$.items[1].petId").value(222))
-            .andExpect(jsonPath("$.items[2].petId").value(222));
+        when(visitRepository.save(any(Visit.class))).thenReturn(visit);
+
+        // When
+        Visit result = visitResource.create(visit, 1);
+
+        // Then
+        assertEquals(1, result.getPetId());
+        verify(visitRepository).save(visit);
+    }
+
+    @Test
+    void testCreateVisitWithInvalidPetId() {
+        // Given
+        Visit visit = new Visit();
+        visit.setDate(new Date());
+        visit.setDescription("Annual checkup");
+
+        // When & Then
+        ResponseStatusException exception = assertThrows(
+            ResponseStatusException.class,
+            () -> visitResource.create(visit, 0)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        assertEquals("Invalid pet ID", exception.getReason());
+    }
+
+    @Test
+    void testCreateVisitWithNullDescription() {
+        // Given
+        Visit visit = new Visit();
+        visit.setDate(new Date());
+        visit.setDescription(null);  // Null description
+
+        // When & Then
+        ResponseStatusException exception = assertThrows(
+            ResponseStatusException.class,
+            () -> visitResource.create(visit, 1)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        assertEquals("Visit description is required", exception.getReason());
+    }
+
+    @Test
+    void testCreateVisitWithNullDate() {
+        // Given
+        Visit visit = new Visit();
+        visit.setDate(null);  // Null date
+        visit.setDescription("Annual checkup");
+
+        // When & Then
+        ResponseStatusException exception = assertThrows(
+            ResponseStatusException.class,
+            () -> visitResource.create(visit, 1)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        assertEquals("Visit date is required", exception.getReason());
+    }
+
+    @Test
+    void testReadVisitsForPet() {
+        // Given
+        Visit visit1 = new Visit();
+        visit1.setPetId(1);
+        Visit visit2 = new Visit();
+        visit2.setPetId(1);
+        List<Visit> expected = Arrays.asList(visit1, visit2);
+
+        when(visitRepository.findByPetId(1)).thenReturn(expected);
+
+        // When
+        List<Visit> result = visitResource.read(1);
+
+        // Then
+        assertEquals(expected, result);
+        verify(visitRepository).findByPetId(1);
+    }
+
+    @Test
+    void testGetVisitsForMultiplePets() {
+        // Given
+        List<Integer> petIds = Arrays.asList(1, 2);
+        Visit visit1 = new Visit();
+        visit1.setPetId(1);
+        Visit visit2 = new Visit();
+        visit2.setPetId(2);
+        List<Visit> visits = Arrays.asList(visit1, visit2);
+
+        when(visitRepository.findByPetIdIn(petIds)).thenReturn(visits);
+
+        // When
+        VisitResource.Visits result = visitResource.read(petIds);
+
+        // Then
+        assertEquals(visits, result.items());
+        verify(visitRepository).findByPetIdIn(petIds);
+    }
+
+    @Test
+    void testGetVisitsForMultiplePetsEmptyList() {
+        // Given
+        List<Integer> petIds = Arrays.asList(1, 2);
+        List<Visit> visits = Arrays.asList(); // Empty list
+
+        when(visitRepository.findByPetIdIn(petIds)).thenReturn(visits);
+
+        // When
+        VisitResource.Visits result = visitResource.read(petIds);
+
+        // Then
+        assertTrue(result.items().isEmpty());
+        verify(visitRepository).findByPetIdIn(petIds);
+    }
+
+    @Test
+    void testRepositoryExceptionHandling() {
+        // Arrange
+        when(visitRepository.findByPetId(anyInt())).thenThrow(new RuntimeException("Database error"));
+
+        // Act & Assert
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+            visitResource.read(1);
+        });
+
+        // Kiểm tra mã lỗi và thông báo lỗi
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getStatusCode());
+        assertEquals("Database error", exception.getReason());
     }
 }
