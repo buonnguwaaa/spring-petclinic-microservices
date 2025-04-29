@@ -1,0 +1,7 @@
+# spring-petclinic-api-gateway/Dockerfile
+FROM openjdk:17-jdk-slim        # base image
+WORKDIR /app
+# Copy jar đã build bằng Maven
+COPY target/spring-petclinic-api-gateway-*.jar app.jar
+EXPOSE 8080                      # port admin-server chạy
+ENTRYPOINT ["java","-jar","/app.jar"]
