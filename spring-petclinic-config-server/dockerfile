@@ -1,5 +1,5 @@
 # spring-petclinic-config-server/Dockerfile
-FROM openjdk:17-jdk-slim        # base image
+FROM openjdk:17-jdk-slim    
 WORKDIR /app
 # Copy jar đã build bằng Maven
 COPY target/spring-petclinic-config-server-*.jar app.jar

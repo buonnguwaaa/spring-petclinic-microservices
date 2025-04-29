@@ -1,6 +1,6 @@
 
 # spring-petclinic-genai-service/Dockerfile
-FROM openjdk:17-jdk-slim        # base image
+FROM openjdk:17-jdk-slim       
 WORKDIR /app
 # Copy jar đã build bằng Maven
 COPY target/spring-petclinic-genai-service-*.jar app.jar

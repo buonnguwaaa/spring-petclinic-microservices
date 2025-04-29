@@ -1,5 +1,5 @@
 # spring-petclinic-api-gateway/Dockerfile
-FROM openjdk:17-jdk-slim        # base image
+FROM openjdk:17-jdk-slim      
 WORKDIR /app
 # Copy jar đã build bằng Maven
 COPY target/spring-petclinic-api-gateway-*.jar app.jar
