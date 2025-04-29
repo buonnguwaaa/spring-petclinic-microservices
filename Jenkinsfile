@@ -21,7 +21,7 @@ pipeline {
                     submoduleCfg: [], 
                     userRemoteConfigs: [[
                         credentialsId: 'github-credentials', 
-                        url: "https://github.com/spring-petclinic/spring-petclinic-microservices.git"
+                        url: "https://github.com/thainhat04/spring-petclinic-microservices.git"
                     ]]
                 ])
             }
