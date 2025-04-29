@@ -6,8 +6,7 @@ pipeline {
     }
 
     environment {
-        DOCKER_HUB_CREDS = credentials('dockerhub-creds')
-        DOCKER_HUB_USERNAME = 'tranthainhat2k4@gmail.com' // Đổi thành username Docker Hub của bạn
+        DOCKER_HUB_USERNAME = 'thainhat' 
     }
 
     stages {
@@ -18,7 +17,6 @@ pipeline {
                     branches: [[name: "${params.BRANCH_NAME}"]],
                     doGenerateSubmoduleConfigurations: false,
                     extensions: [],
-                    submoduleCfg: [],
                     userRemoteConfigs: [[
                         credentialsId: 'github-credentials',
                         url: "https://github.com/thainhat04/spring-petclinic-microservices.git"
@@ -30,14 +28,11 @@ pipeline {
         stage('Determine Changes') {
             steps {
                 script {
-                    // Lấy commit ID
                     env.COMMIT_ID = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                     echo "Building for commit: ${env.COMMIT_ID}"
 
-                    // Lấy danh sách file thay đổi
                     def changedFiles = sh(script: 'git diff-tree --no-commit-id --name-only -r HEAD', returnStdout: true).trim()
 
-                    // Danh sách thư mục dịch vụ thực tế (trong Git)
                     def services = [
                         'spring-petclinic-admin-server',
                         'spring-petclinic-api-gateway',
@@ -48,7 +43,6 @@ pipeline {
                         'spring-petclinic-genai-service'
                     ]
 
-                    // Map ánh xạ tên thư mục → tên Docker image
                     def serviceMap = [
                         'spring-petclinic-admin-server': 'petclinic-admin-server',
                         'spring-petclinic-api-gateway': 'petclinic-api-gateway',
@@ -61,7 +55,6 @@ pipeline {
 
                     env.SERVICE_MAP = groovy.json.JsonOutput.toJson(serviceMap)
 
-                    // Xác định các service thay đổi
                     env.CHANGED_SERVICES = ""
                     for (service in services) {
                         if (changedFiles.contains(service)) {
@@ -97,28 +90,31 @@ pipeline {
 
         stage('Build & Push Docker Images') {
             steps {
-                script {
-                    def serviceMap = readJSON text: env.SERVICE_MAP
-                    def servicesList = env.CHANGED_SERVICES.split(" ")
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
+                                                  usernameVariable: 'DOCKER_USER',
+                                                  passwordVariable: 'DOCKER_PASS')]) {
+                    script {
+                        def serviceMap = readJSON text: env.SERVICE_MAP
+                        def servicesList = env.CHANGED_SERVICES.split(" ")
 
-                    // Đăng nhập Docker Hub
-                    sh 'echo $DOCKER_HUB_CREDS_PSW | docker login -u $DOCKER_HUB_CREDS_USR --password-stdin'
+                        sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
 
-                    for (service in servicesList) {
-                        if (service.trim()) {
-                            def imageName = "${DOCKER_HUB_USERNAME}/${serviceMap[service]}"
-                            dir(service) {
-                                echo "Building and pushing Docker image: ${imageName}"
-
-                                sh """
-                                docker build -t ${imageName}:${COMMIT_ID} .
-                                docker push ${imageName}:${COMMIT_ID}
-
-                                if [ "${params.BRANCH_NAME}" = "main" ]; then
-                                    docker tag ${imageName}:${COMMIT_ID} ${imageName}:latest
-                                    docker push ${imageName}:latest
-                                fi
-                                """
+                        for (service in servicesList) {
+                            if (service.trim()) {
+                                def imageName = "${DOCKER_USER}/${serviceMap[service]}"
+                                dir(service) {
+                                    echo "📦 Building & pushing Docker image: ${imageName}:${env.COMMIT_ID}"
+                                    sh """
+                                        docker build -t ${imageName}:${env.COMMIT_ID} .
+                                        docker push ${imageName}:${env.COMMIT_ID}
+                                    """
+                                    if (params.BRANCH_NAME == 'main') {
+                                        sh """
+                                            docker tag ${imageName}:${env.COMMIT_ID} ${imageName}:latest
+                                            docker push ${imageName}:latest
+                                        """
+                                    }
+                                }
                             }
                         }
                     }
@@ -129,11 +125,9 @@ pipeline {
 
     post {
         always {
-            script {
-                sh 'docker logout || true'
-                cleanWs()
-            }
+            echo '🧹 Cleaning up Docker & workspace...'
+            sh 'docker logout || true'
+            cleanWs()
         }
     }
-
 }
