@@ -128,11 +128,12 @@ pipeline {
     }
 
     post {
-        always {
-            script {
-                sh 'docker logout'
-                cleanWs()
-            }
+    always {
+        script {
+            sh 'docker logout || true'
+            cleanWs()
         }
     }
+}
+
 }
