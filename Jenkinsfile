@@ -7,7 +7,7 @@ pipeline {
 
     environment {
         DOCKER_HUB_CREDS = credentials('dockerhub-creds')
-        DOCKER_HUB_USERNAME = 'thainhat' // Đổi thành username Docker Hub của bạn
+        DOCKER_HUB_USERNAME = 'tranthainhat2k4@gmail.com' // Đổi thành username Docker Hub của bạn
     }
 
     stages {
