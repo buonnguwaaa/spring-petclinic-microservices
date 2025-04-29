@@ -3,5 +3,6 @@ FROM openjdk:17-jdk-slim
 WORKDIR /app
 # Copy jar đã build bằng Maven
 COPY target/spring-petclinic-admin-server-*.jar app.jar
-EXPOSE 9090                      # port admin-server chạy
+# port admin-server chạy
+EXPOSE 9090                      
 ENTRYPOINT ["java","-jar","/app.jar"]
