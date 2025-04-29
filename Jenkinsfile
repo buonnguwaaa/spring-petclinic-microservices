@@ -88,15 +88,16 @@ pipeline {
             }
         }
 
-        stage('Build & Push Docker Images') {
+       stage('Build & Push Docker Images') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
-                                                  usernameVariable: 'DOCKER_USER',
-                                                  passwordVariable: 'DOCKER_PASS')]) {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', 
+                                                usernameVariable: 'DOCKER_USER', 
+                                                passwordVariable: 'DOCKER_PASS')]) {
                     script {
                         def serviceMap = readJSON text: env.SERVICE_MAP
                         def servicesList = env.CHANGED_SERVICES.split(" ")
 
+                        // Perform Docker login
                         sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
 
                         for (service in servicesList) {
