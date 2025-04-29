@@ -6,7 +6,7 @@ pipeline {
     }
 
     environment {
-        DOCKER_HUB_CREDS = credentials('dockerhub-credentials')
+        DOCKER_HUB_CREDS = credentials('dockerhub-creds')
         DOCKER_HUB_USERNAME = 'thainhat' // Đổi thành username Docker Hub của bạn
     }
 
@@ -129,9 +129,11 @@ pipeline {
 
     post {
         always {
-            script {
-                sh 'docker logout'
-                cleanWs()
+            node {
+                script {
+                    sh 'docker logout'
+                    cleanWs()
+                }
             }
         }
     }
