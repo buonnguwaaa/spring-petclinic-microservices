@@ -39,13 +39,13 @@ pipeline {
                     
                     // Define services to check
                     def services = [
-                        'spring-petclinic-admin-server',
-                        'spring-petclinic-api-gateway',
-                        'spring-petclinic-customers-service',
-                        'spring-petclinic-discovery-server',
-                        'spring-petclinic-vets-service',
-                        'spring-petclinic-visits-service',
-                        'spring-petclinic-genai-service'
+                        'petclinic-admin-server',
+                        'petclinic-api-gateway',
+                        'petclinic-customers-service',
+                        'petclinic-discovery-server',
+                        'petclinic-vets-service',
+                        'petclinic-visits-service',
+                        'petclinic-genai-service'
                     ]
                     
                     // Determine which services changed
