@@ -87,7 +87,7 @@ pipeline {
                         if (service.trim()) {
                             dir(service) {
                                 echo "Building ${service}"
-                                sh './mvnw clean package -DskipTests'
+                                sh 'mvn clean package -DskipTests'
                             }
                         }
                     }
@@ -128,12 +128,12 @@ pipeline {
     }
 
     post {
-    always {
-        script {
-            sh 'docker logout || true'
-            cleanWs()
+        always {
+            script {
+                sh 'docker logout || true'
+                cleanWs()
+            }
         }
     }
-}
 
 }
