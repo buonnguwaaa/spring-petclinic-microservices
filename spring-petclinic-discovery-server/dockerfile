@@ -1,0 +1,7 @@
+# spring-petclinic-discovery-server/Dockerfile
+FROM openjdk:17-jdk-slim        # base image
+WORKDIR /app
+# Copy jar đã build bằng Maven
+COPY target/spring-petclinic-discovery-server-*.jar app.jar
+EXPOSE 8888                      # port admin-server chạy
+ENTRYPOINT ["java","-jar","/app.jar"]
