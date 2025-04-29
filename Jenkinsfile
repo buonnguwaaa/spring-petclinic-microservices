@@ -7,7 +7,7 @@ pipeline {
     
     environment {
         DOCKER_HUB_CREDS = credentials('dockerhub-credentials')
-        DOCKER_HUB_USERNAME = 'your-dockerhub-username' // Replace with actual username
+        DOCKER_HUB_USERNAME = 'thainhat' // Replace with actual username
     }
     
     stages {
@@ -116,4 +116,4 @@ pipeline {
             cleanWs()
         }
     }
-}
+}   
