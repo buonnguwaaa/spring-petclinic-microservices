@@ -6,7 +6,7 @@ pipeline {
     }
 
     environment {
-        DOCKER_HUB_USERNAME = 'thainhat' 
+        DOCKER_HUB_USERNAME = 'thainhat'
     }
 
     stages {
@@ -19,102 +19,89 @@ pipeline {
                     extensions: [],
                     userRemoteConfigs: [[
                         credentialsId: 'github-credentials',
-                        url: "https://github.com/thainhat04/spring-petclinic-microservices.git"
+                        url: 'https://github.com/thainhat04/spring-petclinic-microservices.git'
                     ]]
                 ])
             }
         }
 
-        stage('Determine Changes') {
+        stage('Detect Changes') {
             steps {
                 script {
                     env.COMMIT_ID = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    echo "Building for commit: ${env.COMMIT_ID}"
+                    echo "🧠 Commit ID: ${env.COMMIT_ID}"
 
                     def changedFiles = sh(script: 'git diff-tree --no-commit-id --name-only -r HEAD', returnStdout: true).trim()
 
-                    def services = [
+                    def allServices = [
                         'spring-petclinic-admin-server',
                         'spring-petclinic-api-gateway',
                         'spring-petclinic-customers-service',
                         'spring-petclinic-discovery-server',
                         'spring-petclinic-vets-service',
                         'spring-petclinic-visits-service',
-                        'spring-petclinic-genai-service'
+                        'spring-petclinic-genai-service',
+                        'spring-petclinic-config-server'
                     ]
 
-                    def serviceMap = [
-                        'spring-petclinic-admin-server': 'petclinic-admin-server',
-                        'spring-petclinic-api-gateway': 'petclinic-api-gateway',
-                        'spring-petclinic-customers-service': 'petclinic-customers-service',
-                        'spring-petclinic-discovery-server': 'petclinic-discovery-server',
-                        'spring-petclinic-vets-service': 'petclinic-vets-service',
-                        'spring-petclinic-visits-service': 'petclinic-visits-service',
-                        'spring-petclinic-genai-service': 'petclinic-genai-service'
-                    ]
-
-                    env.SERVICE_MAP = groovy.json.JsonOutput.toJson(serviceMap)
-
-                    env.CHANGED_SERVICES = ""
-                    for (service in services) {
+                    def changedServices = []
+                    for (service in allServices) {
                         if (changedFiles.contains(service)) {
-                            env.CHANGED_SERVICES += "${service} "
+                            changedServices << service
                         }
                     }
 
-                    if (env.CHANGED_SERVICES.trim() == "") {
-                        echo "Không phát hiện thay đổi cụ thể. Sẽ build tất cả services."
-                        env.CHANGED_SERVICES = services.join(" ")
+                    if (changedServices.isEmpty()) {
+                        echo "❗Không phát hiện thay đổi, sẽ build tất cả service."
+                        changedServices = allServices
                     } else {
-                        echo "Detected changes in: ${env.CHANGED_SERVICES}"
+                        echo "🔍 Các service thay đổi: ${changedServices.join(', ')}"
                     }
+
+                    env.CHANGED_SERVICES = changedServices.join(" ")
                 }
             }
         }
 
-        stage('Build Services') {
+        stage('Build JAR') {
             steps {
                 script {
-                    def servicesList = env.CHANGED_SERVICES.split(" ")
-                    for (service in servicesList) {
-                        if (service.trim()) {
-                            dir(service) {
-                                echo "Building ${service}"
-                                sh 'mvn clean package -DskipTests'
-                            }
+                    def services = env.CHANGED_SERVICES.split(" ")
+                    for (service in services) {
+                        dir(service.trim()) {
+                            echo "🔨 Building JAR for ${service}"
+                            sh 'mvn clean package -DskipTests'
                         }
                     }
                 }
             }
         }
 
-       stage('Build & Push Docker Images') {
+        stage('Build & Push Docker Images') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
-                                                usernameVariable: 'DOCKER_USER', 
-                                                passwordVariable: 'DOCKER_PASS')]) {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
                     script {
-                        def serviceMap = readJSON text: env.SERVICE_MAP
-                        def servicesList = env.CHANGED_SERVICES.split(" ")
-
-                        // Perform Docker login
+                        def services = env.CHANGED_SERVICES.split(" ")
                         sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
 
-                        for (service in servicesList) {
-                            if (service.trim()) {
-                                def imageName = "${DOCKER_USER}/${serviceMap[service]}"
-                                dir(service) {
-                                    echo "📦 Building & pushing Docker image: ${imageName}:${env.COMMIT_ID}"
+                        for (service in services) {
+                            def image = "${DOCKER_USER}/${service.trim()}"
+                            dir(service.trim()) {
+                                echo "🐳 Build & push image: ${image}:${env.COMMIT_ID}"
+                                sh """
+                                    docker build -t ${image}:${env.COMMIT_ID} .
+                                    docker push ${image}:${env.COMMIT_ID}
+                                """
+
+                                if (params.BRANCH_NAME == 'main') {
                                     sh """
-                                        docker build -t ${imageName}:${env.COMMIT_ID} .
-                                        docker push ${imageName}:${env.COMMIT_ID}
+                                        docker tag ${image}:${env.COMMIT_ID} ${image}:latest
+                                        docker push ${image}:latest
                                     """
-                                    if (params.BRANCH_NAME == 'main') {
-                                        sh """
-                                            docker tag ${imageName}:${env.COMMIT_ID} ${imageName}:latest
-                                            docker push ${imageName}:latest
-                                        """
-                                    }
                                 }
                             }
                         }
@@ -126,7 +113,7 @@ pipeline {
 
     post {
         always {
-            echo '🧹 Cleaning up Docker & workspace...'
+            echo '🧹 Cleaning workspace & logout Docker...'
             sh 'docker logout || true'
             cleanWs()
         }
