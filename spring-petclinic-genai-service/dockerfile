@@ -1,6 +1,15 @@
-# Dockerfile cho GenAI Service
-FROM openjdk:11-jre-slim
+# Dockerfile for customers-service
+
+FROM openjdk:17-jdk-slim
+
+# Thư mục làm việc trong container
 WORKDIR /app
+
+# Copy file jar đã build vào container (giả định target/*.jar là output)
 COPY target/*.jar app.jar
+
+# Port service này sử dụng (tuỳ theo service mà thay đổi)
 EXPOSE 8084
+
+# Lệnh khởi chạy
 ENTRYPOINT ["java", "-jar", "app.jar"]
