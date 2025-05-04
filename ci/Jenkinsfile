@@ -32,6 +32,10 @@ pipeline {
                     do
                         cd spring-petclinic-${SERVICE}
                         mvn clean package -DskipTests
+                        if [ ! -f target/*.jar ]; then
+                            echo "Error: JAR file not found for ${SERVICE}"
+                            exit 1
+                        fi
                         cd ..
                     done
                 '''
@@ -57,6 +61,7 @@ pipeline {
                                 echo "Building image: ${imageName}"
 
                                 sh """
+                                    mv ${serviceDir}/target/*.jar ${serviceDir}/target/app.jar
                                     docker build -t ${imageName} -f ${serviceDir}/Dockerfile ${serviceDir}
                                     docker tag ${imageName} ${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:latest
                                 """
