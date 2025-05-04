@@ -10,5 +10,4 @@ COPY target/*.jar app.jar
 
 EXPOSE 8083
 
-# Lệnh khởi chạy
 ENTRYPOINT ["java", "-jar", "app.jar"]
