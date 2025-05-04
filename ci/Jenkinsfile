@@ -1,0 +1,128 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
+        DOCKERHUB_USER = 'thainhat'
+    }
+
+    stages {
+        stage('Prepare Workspace') {
+            steps {
+                script {
+                    // Remove the lock file if it exists
+                    sh '''
+                        if [ -f ${WORKSPACE}/.git/index.lock ]; then
+                            rm -f ${WORKSPACE}/.git/index.lock
+                        fi
+                    '''
+                }
+                checkout scm
+            }
+        }
+
+        stage('Build and Push Services') {
+            matrix {
+                axes {
+                    axis {
+                        name 'SERVICE'
+                        values 'api-gateway', 'config-server', 'discovery-server', 'admin-server', 'customers-service', 'vets-service', 'visits-service', 'genai-service'
+                    }
+                }
+                stages {
+                    stage('Build Maven Project') {
+                        steps {
+                            sh '''
+                                if ! command -v mvn &> /dev/null; then
+                                    apt-get update && apt-get install -y maven
+                                fi
+
+                                cd spring-petclinic-${SERVICE}
+                                mvn clean package -DskipTests
+                                echo "Contents of target directory for ${SERVICE}:"
+                                ls -la target/
+                            '''
+                        }
+                    }
+                    
+                    stage('Build Docker Image') {
+                        steps {
+                            script {
+                                def imageTag = "${env.BRANCH_NAME}-${env.GIT_COMMIT.take(8)}"
+                                def serviceDir = "spring-petclinic-${SERVICE}"
+                                def imageName = "${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:${imageTag}"
+
+                                echo "Building image: ${imageName}"
+
+                                // Create a simple Dockerfile directly instead of using the service's Dockerfile
+                                sh """
+                                    cd ${serviceDir}
+                                    
+                                    # Determine the correct jar file
+                                    JAR_FILE=\$(find target -name "*.jar" -not -name "*sources.jar" -not -name "*javadoc.jar" | head -1)
+                                    
+                                    if [ -z "\$JAR_FILE" ]; then
+                                        echo "Error: No JAR file found in ${serviceDir}/target"
+                                        exit 1
+                                    fi
+                                    
+                                    echo "Using JAR file: \$JAR_FILE"
+                                    
+                                    # Create a Dockerfile that uses the actual jar file path
+                                    cat > Dockerfile.jenkins <<EOF
+FROM openjdk:11-jre-slim
+WORKDIR /app
+COPY \$JAR_FILE app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
+EOF
+                                    
+                                    # Build using the new Dockerfile
+                                    docker build -t ${imageName} -f Dockerfile.jenkins .
+                                    docker tag ${imageName} ${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:latest
+                                """
+                            }
+                        }
+                    }
+
+                    stage('Push Docker Image') {
+                        steps {
+                            script {
+                                def imageTag = "${env.BRANCH_NAME}-${env.GIT_COMMIT.take(8)}"
+                                def imageName = "${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:${imageTag}"
+
+                                echo "Pushing image: ${imageName}"
+
+                                sh """
+                                    echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
+                                    docker push ${imageName}
+                                    docker push ${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:latest
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deployment Summary') {
+            steps {
+                echo "All services have been built and pushed successfully!"
+                echo "Services deployed: api-gateway, config-server, discovery-server, admin-server, customers-service, vets-service, visits-service, genai-service"
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'docker logout'
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed! Please check the logs for details.'
+        }
+    }
+}
