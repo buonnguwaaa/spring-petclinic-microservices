@@ -48,7 +48,7 @@ pipeline {
 
                         sh """
                             cd ${svc}
-                            ./mvnw clean package -DskipTests
+                            mvn clean package -DskipTests
                             docker build -t ${image} .
                             echo "${DOCKER_HUB_PASS}" | docker login -u "${DOCKER_HUB_USER}" --password-stdin
                             docker push ${image}
