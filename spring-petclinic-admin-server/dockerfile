@@ -1,8 +1,7 @@
-# spring-petclinic-admin-server/Dockerfile
-FROM openjdk:17-jdk-slim       
+# Dockerfile cho Admin Server
+FROM openjdk:11-jre-slim
 WORKDIR /app
-# Copy jar đã build bằng Maven
-COPY target/spring-petclinic-admin-server-*.jar app.jar
-# port admin-server chạy
-EXPOSE 9090                      
-ENTRYPOINT ["java","-jar","/app.jar"]
+ARG JAR_FILE=target/*.jar
+COPY ${JAR_FILE} app.jar
+EXPOSE 9090
+ENTRYPOINT ["java", "-jar", "app.jar"]

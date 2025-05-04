@@ -1,8 +1,7 @@
-# spring-petclinic-discovery-server/Dockerfile
-FROM openjdk:17-jdk-slim      
+# Dockerfile cho Discovery Server (Eureka)
+FROM openjdk:11-jre-slim
 WORKDIR /app
-# Copy jar đã build bằng Maven
-COPY target/spring-petclinic-discovery-server-*.jar app.jar
-# port admin-server chạy
-EXPOSE 8888                      
-ENTRYPOINT ["java","-jar","/app.jar"]
+ARG JAR_FILE=target/*.jar
+COPY ${JAR_FILE} app.jar
+EXPOSE 8761
+ENTRYPOINT ["java", "-jar", "app.jar"]
