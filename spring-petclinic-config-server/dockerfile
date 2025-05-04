@@ -13,3 +13,6 @@ EXPOSE 8888
 
 # Lệnh khởi chạy
 ENTRYPOINT ["java", "-jar", "app.jar"]
+
+
+# # Dockerfile for customers-service
