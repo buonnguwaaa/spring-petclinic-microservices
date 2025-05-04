@@ -40,31 +40,28 @@ pipeline {
 
         stage('Build & Push Docker Images') {
             when {
-                expression { return changedServices && changedServices.size() > 0 }  // Kiểm tra nếu có dịch vụ thay đổi
+                expression { return changedServices && changedServices.size() > 0 }
             }
             steps {
                 script {
-                    // Đăng nhập vào Docker Hub với credentials
                     withCredentials([usernamePassword(
-                        credentialsId: 'dockerhub-credentials', // Đảm bảo ID này đúng trong Jenkins
+                        credentialsId: 'dockerhub-credentials', 
                         usernameVariable: 'DOCKER_HUB_USER',
                         passwordVariable: 'DOCKER_HUB_PASS'
                     )]) {
-                        // Lặp qua từng service thay đổi và thực hiện build + push Docker image
-                        for (svc in changedServices) {
-                            def image = "${DOCKER_HUB_USER}/spring-petclinic-${svc}:${IMAGE_TAG}"  // Tạo tên image với tiền tố spring-petclinic-
+                        docker.withRegistry('', 'dockerhub-credentials') {
+                            for (svc in changedServices) {
+                                // Tạo đầy đủ tên image với namespace Docker Hub
+                                def imageName = "${DOCKER_HUB_USER}/spring-petclinic-${svc}"
+                                def fullTag   = "${imageName}:${IMAGE_TAG}"
 
-                            echo "🚧 Đang xử lý ${svc}..."
+                                echo "🚧 Building image ${fullTag}..."
+                                // build image với đầy đủ tên (thay đổi tương tự docker tag + push)
+                                def img = docker.build(fullTag, "--file spring-petclinic-${svc}/Dockerfile spring-petclinic-${svc}")
 
-                            sh """
-                                cd spring-petclinic-${svc}  
-                                mvn clean package -DskipTests  
-                                docker build -t ${image} .  
-                                echo "${DOCKER_HUB_PASS}" | docker login -u "${DOCKER_HUB_USER}" --password-stdin  
-                                docker push ${image}  
-                            """
-
-                            echo "✅ Đã push Docker image: ${image}"
+                                echo "🚀 Pushing image ${fullTag}..."
+                                img.push()
+                            }
                         }
                     }
                 }
