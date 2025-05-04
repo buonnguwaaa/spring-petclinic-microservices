@@ -21,30 +21,7 @@ pipeline {
             }
         }
 
-        stage('Build Maven Project') {
-            steps {
-                sh '''
-                    if ! command -v mvn &> /dev/null; then
-                        apt-get update && apt-get install -y maven
-                    fi
-
-                    for SERVICE in api-gateway config-server discovery-server admin-server customers-service vets-service visits-service genai-service
-                    do
-                        cd spring-petclinic-${SERVICE}
-                        mvn clean package -DskipTests
-                        echo "Contents of target directory for ${SERVICE}:"
-                        ls -l target
-                        if [ ! -f target/*.jar ]; then
-                            echo "Error: JAR file not found for ${SERVICE}"
-                            exit 1
-                        fi
-                        cd ..
-                    done
-                '''
-            }
-        }
-
-        stage('Build and Push Docker Images') {
+        stage('Build and Push Services') {
             matrix {
                 axes {
                     axis {
@@ -53,6 +30,21 @@ pipeline {
                     }
                 }
                 stages {
+                    stage('Build Maven Project') {
+                        steps {
+                            sh '''
+                                if ! command -v mvn &> /dev/null; then
+                                    apt-get update && apt-get install -y maven
+                                fi
+
+                                cd spring-petclinic-${SERVICE}
+                                mvn clean package -DskipTests
+                                echo "Contents of target directory for ${SERVICE}:"
+                                ls -la target/
+                            '''
+                        }
+                    }
+                    
                     stage('Build Docker Image') {
                         steps {
                             script {
@@ -62,13 +54,31 @@ pipeline {
 
                                 echo "Building image: ${imageName}"
 
+                                // Create a simple Dockerfile directly instead of using the service's Dockerfile
                                 sh """
-                                    if [ ! -f ${serviceDir}/target/*.jar ]; then
-                                        echo "Error: JAR file not found in ${serviceDir}/target"
+                                    cd ${serviceDir}
+                                    
+                                    # Determine the correct jar file
+                                    JAR_FILE=\$(find target -name "*.jar" -not -name "*sources.jar" -not -name "*javadoc.jar" | head -1)
+                                    
+                                    if [ -z "\$JAR_FILE" ]; then
+                                        echo "Error: No JAR file found in ${serviceDir}/target"
                                         exit 1
                                     fi
-                                    mv ${serviceDir}/target/*.jar ${serviceDir}/target/app.jar
-                                    docker build -t ${imageName} -f ${serviceDir}/Dockerfile ${serviceDir}
+                                    
+                                    echo "Using JAR file: \$JAR_FILE"
+                                    
+                                    # Create a Dockerfile that uses the actual jar file path
+                                    cat > Dockerfile.jenkins <<EOF
+FROM openjdk:11-jre-slim
+WORKDIR /app
+COPY \$JAR_FILE app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
+EOF
+                                    
+                                    # Build using the new Dockerfile
+                                    docker build -t ${imageName} -f Dockerfile.jenkins .
                                     docker tag ${imageName} ${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:latest
                                 """
                             }
