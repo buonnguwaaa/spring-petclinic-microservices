@@ -2,38 +2,38 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_TAG = "${GIT_COMMIT}" // Gắn tag bằng commit ID
+        IMAGE_TAG = "${GIT_COMMIT}" // Tagging with the commit ID
     }
 
     stages {
         stage('Checkout') {
             steps {
-                checkout scm  // Checkout mã nguồn từ repo
+                checkout scm  // Checkout source code from the repository
             }
         }
 
         stage('Detect Changed Services') {
             steps {
                 script {
-                    // Lấy danh sách các file thay đổi giữa HEAD~1 và HEAD
+                    // Get the list of files changed between HEAD~1 and HEAD
                     def output = sh(script: "git diff --name-only HEAD~1 HEAD", returnStdout: true).trim()
                     def files = output.tokenize('\n')
 
-                    // Lọc ra các dịch vụ có thay đổi (danh sách các thư mục bắt đầu bằng spring-petclinic-)
+                    // Filter for services that have changes (directories starting with spring-petclinic-)
                     changedServices = files
-                        .findAll { it ==~ /^spring-petclinic-.*/ } // Các file trong thư mục có tiền tố spring-petclinic-
-                        .collect { it.split('/')[0].replace("spring-petclinic-", "") }  // Lấy tên service sau tiền tố
+                        .findAll { it ==~ /^spring-petclinic-.*/ } // Match directories with spring-petclinic- prefix
+                        .collect { it.split('/')[0].replace("spring-petclinic-", "") }  // Get service names after the prefix
                         .unique()
 
-                    // Nếu không có dịch vụ nào thay đổi, kết thúc pipeline
+                    // If no services have changed, terminate the pipeline
                     if (changedServices.isEmpty()) {
-                        echo "✅ Không có service nào thay đổi, kết thúc pipeline."
+                        echo "✅ No services have changed, terminating pipeline."
                         currentBuild.result = 'SUCCESS'
                         return
                     }
 
-                    // Hiển thị các dịch vụ đã thay đổi
-                    echo "🛠 Dịch vụ thay đổi: ${changedServices}"
+                    // Display the changed services
+                    echo "🛠 Changed services: ${changedServices}"
                 }
             }
         }
@@ -44,6 +44,7 @@ pipeline {
             }
             steps {
                 script {
+                    // Using credentials to log in to Docker Hub
                     withCredentials([usernamePassword(
                         credentialsId: 'dockerhub-credentials', 
                         usernameVariable: 'DOCKER_HUB_USER',
@@ -51,15 +52,16 @@ pipeline {
                     )]) {
                         docker.withRegistry('', 'dockerhub-credentials') {
                             for (svc in changedServices) {
-                                // Tạo đầy đủ tên image với namespace Docker Hub
+                                // Construct the full image name with your Docker Hub username
                                 def imageName = "${DOCKER_HUB_USER}/spring-petclinic-${svc}"
                                 def fullTag   = "${imageName}:${IMAGE_TAG}"
 
                                 echo "🚧 Building image ${fullTag}..."
-                                // build image với đầy đủ tên (thay đổi tương tự docker tag + push)
+                                // Build the Docker image with the specified tag
                                 def img = docker.build(fullTag, "--file spring-petclinic-${svc}/Dockerfile spring-petclinic-${svc}")
 
                                 echo "🚀 Pushing image ${fullTag}..."
+                                // Push the built image to Docker Hub
                                 img.push()
                             }
                         }
@@ -71,10 +73,10 @@ pipeline {
 
     post {
         success {
-            echo "🎉 Build và Push thành công!"
+            echo "🎉 Build and Push successful!"
         }
         failure {
-            echo "❌ Có lỗi xảy ra trong pipeline."
+            echo "❌ An error occurred in the pipeline."
         }
     }
 }
