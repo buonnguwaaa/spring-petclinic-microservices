@@ -8,7 +8,6 @@ WORKDIR /app
 # Copy file jar đã build vào container (giả định target/*.jar là output)
 COPY target/*.jar app.jar
 
-# Port service này sử dụng (tuỳ theo service mà thay đổi)
 EXPOSE 8083
 
 # Lệnh khởi chạy
