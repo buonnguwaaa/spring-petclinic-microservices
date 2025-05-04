@@ -1,7 +1,7 @@
 pipeline {
     agent any
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')  // bạn tạo trong Jenkins
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')  // Bạn đã tạo trong Jenkins
         DOCKERHUB_USER = 'thainhat'
     }
     stages {
@@ -22,9 +22,11 @@ pipeline {
                     stage('Build Docker Image') {
                         steps {
                             script {
-                                def image = "${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:${env.GIT_COMMIT}"
+                                def imageTag = "${env.BRANCH_NAME}-${env.GIT_COMMIT}"
+                                def imageName = "${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:${imageTag}"
+                                echo "Building image: ${imageName}"
                                 sh """
-                                    docker build -t ${image} spring-petclinic-${SERVICE}
+                                    docker build -t ${imageName} spring-petclinic-${SERVICE}
                                 """
                             }
                         }
@@ -32,10 +34,12 @@ pipeline {
                     stage('Push Docker Image') {
                         steps {
                             script {
-                                def image = "${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:${env.GIT_COMMIT}"
+                                def imageTag = "${env.BRANCH_NAME}-${env.GIT_COMMIT}"
+                                def imageName = "${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:${imageTag}"
+                                echo "Pushing image: ${imageName}"
                                 sh """
                                     echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
-                                    docker push ${image}
+                                    docker push ${imageName}
                                 """
                             }
                         }
