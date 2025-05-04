@@ -2,8 +2,6 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_HUB_USER = 'thainhat'     // 👉 Thay bằng Docker Hub của bạn
-        DOCKER_HUB_PASS = credentials('dockerhub-credentials') // 👉 Tên biến secret text đã lưu trong Jenkins
         IMAGE_TAG = "${GIT_COMMIT}" // Gắn tag bằng commit ID
     }
 
@@ -20,10 +18,9 @@ pipeline {
                     def output = sh(script: "git diff --name-only HEAD~1 HEAD", returnStdout: true).trim()
                     def files = output.tokenize('\n')
 
-                    // Tìm kiếm các thư mục có tên theo kiểu spring-petclinic-<service name>
                     changedServices = files
-                        .findAll { it ==~ /^spring-petclinic-.*/ }    // Tìm các thư mục bắt đầu với spring-petclinic-
-                        .collect { it.split('/')[0].replace("spring-petclinic-", "") }  // Lấy tên service sau "spring-petclinic-"
+                        .findAll { it ==~ /^spring-petclinic-.*/ } // bắt đầu với spring-petclinic-
+                        .collect { it.split('/')[0].replace("spring-petclinic-", "") }
                         .unique()
 
                     if (changedServices.isEmpty()) {
@@ -43,19 +40,25 @@ pipeline {
             }
             steps {
                 script {
-                    for (svc in changedServices) {
-                        def image = "${DOCKER_HUB_USER}/spring-petclinic-${svc}:${IMAGE_TAG}"
-                        echo "🚧 Đang xử lý ${svc}..."
+                    withCredentials([usernamePassword(
+                        credentialsId: 'dockerhub-credentials', // 👉 Đảm bảo ID này đúng trong Jenkins
+                        usernameVariable: 'DOCKER_HUB_USER',
+                        passwordVariable: 'DOCKER_HUB_PASS'
+                    )]) {
+                        for (svc in changedServices) {
+                            def image = "${DOCKER_HUB_USER}/spring-petclinic-${svc}:${IMAGE_TAG}"
+                            echo "🚧 Đang xử lý ${svc}..."
 
-                        sh """
-                            cd spring-petclinic-${svc}
-                            mvn clean package -DskipTests
-                            docker build -t ${image} .
-                            echo "${DOCKER_HUB_PASS}" | docker login -u "${DOCKER_HUB_USER}" --password-stdin
-                            docker push ${image}
-                        """
+                            sh """
+                                cd spring-petclinic-${svc}
+                                mvn clean package -DskipTests
+                                docker build -t ${image} .
+                                echo "${DOCKER_HUB_PASS}" | docker login -u "${DOCKER_HUB_USER}" --password-stdin
+                                docker push ${image}
+                            """
 
-                        echo "✅ Đã push Docker image: ${image}"
+                            echo "✅ Đã push Docker image: ${image}"
+                        }
                     }
                 }
             }
