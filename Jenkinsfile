@@ -57,11 +57,11 @@ pipeline {
                             echo "🚧 Đang xử lý ${svc}..."
 
                             sh """
-                                cd spring-petclinic-${svc}  // Di chuyển vào thư mục của service
-                                mvn clean package -DskipTests  // Build package
-                                docker build -t ${image} .  // Tạo Docker image
-                                echo "${DOCKER_HUB_PASS}" | docker login -u "${DOCKER_HUB_USER}" --password-stdin  // Đăng nhập vào Docker Hub
-                                docker push ${image}  // Đẩy Docker image lên Docker Hub
+                                cd spring-petclinic-${svc}  
+                                mvn clean package -DskipTests  
+                                docker build -t ${image} .  
+                                echo "${DOCKER_HUB_PASS}" | docker login -u "${DOCKER_HUB_USER}" --password-stdin  
+                                docker push ${image}  
                             """
 
                             echo "✅ Đã push Docker image: ${image}"
