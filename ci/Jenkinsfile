@@ -29,8 +29,13 @@ pipeline {
                         apt-get update && apt-get install -y maven
                     fi
                     
-                    # Build all microservices
-                    mvn clean package -DskipTests
+                    # Build each microservice individually
+                    for SERVICE in api-gateway config-server discovery-server admin-server customers-service vets-service visits-service genai-service
+                    do
+                        cd spring-petclinic-${SERVICE}
+                        mvn clean package -DskipTests
+                        cd ..
+                    done
                 '''
             }
         }
