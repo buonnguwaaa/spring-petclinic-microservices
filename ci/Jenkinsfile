@@ -1,40 +1,41 @@
 pipeline {
     agent any
-    
+
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         DOCKERHUB_USER = 'thainhat'
+        IMAGE_TAG = "${env.BRANCH_NAME}-${env.GIT_COMMIT.substring(0,8)}"
     }
-    
+
     stages {
         stage('Prepare Workspace') {
             steps {
-                // Xóa file lock nếu tồn tại
+                // Remove the lock file if it exists
                 sh '''
-                    if [ -f /var/lib/jenkins/workspace/petclinic-multi-ci_thainhat/.git/index.lock ]; then
-                        rm -f /var/lib/jenkins/workspace/petclinic-multi-ci_thainhat/.git/index.lock
+                    if [ -f ${WORKSPACE}/.git/index.lock ]; then
+                        rm -f ${WORKSPACE}/.git/index.lock
                     fi
                 '''
-                // Checkout mã nguồn
+                // Checkout source code
                 checkout scm
             }
         }
-        
+
         stage('Build Maven Project') {
             steps {
                 sh '''
-                    # Cài đặt Maven nếu cần
+                    # Install Maven if not installed
                     if ! command -v mvn &> /dev/null; then
                         apt-get update && apt-get install -y maven
                     fi
                     
-                    # Build tất cả các microservices
+                    # Build all microservices
                     mvn clean package -DskipTests
                 '''
             }
         }
-        
-        stage('Build and Push Images') {
+
+        stage('Build and Push Docker Images') {
             matrix {
                 axes {
                     axis {
@@ -47,14 +48,18 @@ pipeline {
                         steps {
                             script {
                                 try {
-                                    def imageTag = "${env.BRANCH_NAME}-${env.GIT_COMMIT.substring(0,8)}"
-                                    def imageName = "${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:${imageTag}"
+                                    def serviceDir = "spring-petclinic-${SERVICE}"
+                                    def imageName = "${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:${IMAGE_TAG}"
                                     echo "Building image: ${imageName}"
+
+                                    // Build Docker image for the current service
                                     sh """
-                                        docker build -t ${imageName} -f spring-petclinic-${SERVICE}/Dockerfile spring-petclinic-${SERVICE}
+                                        docker build -t ${imageName} -f ${serviceDir}/Dockerfile ${serviceDir}
                                     """
-                                    // Tạo tag latest
-                                    sh "docker tag ${imageName} ${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:latest"
+                                    // Create a tag for 'latest'
+                                    sh """
+                                        docker tag ${imageName} ${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:latest
+                                    """
                                 } catch (Exception e) {
                                     currentBuild.result = 'FAILURE'
                                     error "Failed to build Docker image for ${SERVICE}: ${e.message}"
@@ -62,14 +67,17 @@ pipeline {
                             }
                         }
                     }
-                    
+
                     stage('Push Docker Image') {
                         steps {
                             script {
                                 try {
-                                    def imageTag = "${env.BRANCH_NAME}-${env.GIT_COMMIT.substring(0,8)}"
-                                    def imageName = "${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:${imageTag}"
+                                    def serviceDir = "spring-petclinic-${SERVICE}"
+                                    def imageName = "${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:${IMAGE_TAG}"
+
                                     echo "Pushing image: ${imageName}"
+
+                                    // Docker login and push the image to DockerHub
                                     sh """
                                         echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
                                         docker push ${imageName}
@@ -85,7 +93,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Deployment Summary') {
             steps {
                 echo "All services have been built and pushed successfully!"
@@ -93,9 +101,10 @@ pipeline {
             }
         }
     }
-    
+
     post {
         always {
+            // Logout from Docker after job is done
             sh 'docker logout'
             cleanWs()
         }
