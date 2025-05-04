@@ -20,9 +20,10 @@ pipeline {
                     def output = sh(script: "git diff --name-only HEAD~1 HEAD", returnStdout: true).trim()
                     def files = output.tokenize('\n')
 
+                    // Tìm kiếm các thư mục có tên theo kiểu spring-petclinic-<service name>
                     changedServices = files
-                        .findAll { it ==~ /^.+-service\/.*/ }    // Chỉ lấy thư mục có tên *-service/*
-                        .collect { it.split('/')[0] }
+                        .findAll { it ==~ /^spring-petclinic-.*/ }    // Tìm các thư mục bắt đầu với spring-petclinic-
+                        .collect { it.split('/')[0].replace("spring-petclinic-", "") }  // Lấy tên service sau "spring-petclinic-"
                         .unique()
 
                     if (changedServices.isEmpty()) {
@@ -43,11 +44,11 @@ pipeline {
             steps {
                 script {
                     for (svc in changedServices) {
-                        def image = "${DOCKER_HUB_USER}/${svc}:${IMAGE_TAG}"
+                        def image = "${DOCKER_HUB_USER}/spring-petclinic-${svc}:${IMAGE_TAG}"
                         echo "🚧 Đang xử lý ${svc}..."
 
                         sh """
-                            cd ${svc}
+                            cd spring-petclinic-${svc}
                             mvn clean package -DskipTests
                             docker build -t ${image} .
                             echo "${DOCKER_HUB_PASS}" | docker login -u "${DOCKER_HUB_USER}" --password-stdin
