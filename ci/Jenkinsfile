@@ -1,16 +1,18 @@
 pipeline {
     agent any
+    
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')  // Bạn đã tạo trong Jenkins
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         DOCKERHUB_USER = 'thainhat'
     }
+    
     stages {
         stage('Build and Push Images') {
             matrix {
                 axes {
                     axis {
-                        name: 'SERVICE'
-                        values: 'api-gateway', 'config-server', 'discovery-server', 'admin-server', 'customers-service', 'vets-service', 'visits-service', 'genai-service'
+                        name 'SERVICE'
+                        values 'api-gateway', 'config-server', 'discovery-server', 'admin-server', 'customers-service', 'vets-service', 'visits-service', 'genai-service'
                     }
                 }
                 stages {
@@ -19,10 +21,11 @@ pipeline {
                             checkout scm
                         }
                     }
+                    
                     stage('Build Docker Image') {
                         steps {
                             script {
-                                def imageTag = "${env.BRANCH_NAME}-${env.GIT_COMMIT}"
+                                def imageTag = "${env.BRANCH_NAME}-${env.GIT_COMMIT.substring(0,8)}"
                                 def imageName = "${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:${imageTag}"
                                 echo "Building image: ${imageName}"
                                 sh """
@@ -31,10 +34,11 @@ pipeline {
                             }
                         }
                     }
+                    
                     stage('Push Docker Image') {
                         steps {
                             script {
-                                def imageTag = "${env.BRANCH_NAME}-${env.GIT_COMMIT}"
+                                def imageTag = "${env.BRANCH_NAME}-${env.GIT_COMMIT.substring(0,8)}"
                                 def imageName = "${DOCKERHUB_USER}/spring-petclinic-${SERVICE}:${imageTag}"
                                 echo "Pushing image: ${imageName}"
                                 sh """
@@ -46,6 +50,19 @@ pipeline {
                     }
                 }
             }
+        }
+    }
+    
+    post {
+        always {
+            sh 'docker logout'
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed! Please check the logs for details.'
         }
     }
 }
