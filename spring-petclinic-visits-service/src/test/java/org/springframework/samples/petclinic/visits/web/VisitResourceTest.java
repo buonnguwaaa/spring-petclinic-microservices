@@ -85,7 +85,7 @@ class VisitResourceTest {
         Visit visit = Visit.VisitBuilder.aVisit()
                 .id(1)
                 .petId(7)
-                .description("Routine checkup")
+                .description("Routine checkup ")
                 .build();
 
         given(visitRepository.save(any(Visit.class))).willReturn(visit);
